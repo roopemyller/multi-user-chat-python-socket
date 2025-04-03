@@ -6,6 +6,12 @@ PORT = 3000
 clients = {}
 channels = {}
 
+# Function to broadcast messages to all connected clients
+def broadcast(message):
+    for client_socket in clients.values():
+        client_socket.send(message.encode("utf-8"))
+
+# Function to send private messages to a specific client
 def private_message(client_socket, nickname, recipient, msg):
     if recipient in clients:
         # Send the private message to the recipient
@@ -14,6 +20,7 @@ def private_message(client_socket, nickname, recipient, msg):
         # Notify the sender that the recipient is not found
         client_socket.send(f"User '{recipient}' not found!".encode("utf-8"))
 
+# Function to handle channel messages
 def channel_message(client_socket, nickname, channel_name, msg):
      # Broadcast the message to all clients in the specified channel
     if channel_name in channels:
@@ -26,18 +33,25 @@ def channel_message(client_socket, nickname, channel_name, msg):
     else:
         client_socket.send("Channel not found!".encode("utf-8"))
 
+# Function to handle joining and leaving channels
 def join_channel(client_socket, nickname, channel_name):
     if channel_name not in channels:
         channels[channel_name] = []
     channels[channel_name].append(nickname)
     client_socket.send(f"Joined channel {channel_name}".encode("utf-8"))
 
+# Function to handle client disconnection
 def leave_channel(client_socket, nickname, channel_name):
     if channel_name in channels and nickname in channels[channel_name]:
         channels[channel_name].remove(nickname)
         client_socket.send(f"Left channel {channel_name}".encode("utf-8"))
     else:
         client_socket.send(f"You are not in channel {channel_name}".encode("utf-8"))
+
+# Function to handle client exit
+def exit_chat(nickname):
+    broadcast(f"{nickname} disconnected.")
+    print(f"{nickname} disconnected.")
 
 # Function to handle client connections and messages
 def handle_client(client_socket, nickname):
@@ -71,16 +85,16 @@ def handle_client(client_socket, nickname):
             elif message.startswith("/leave"):
                 _, channel_name = message.split(" ", 1)
                 leave_channel(client_socket, nickname, channel_name)
+            
+            # Handle client exit
+            elif message.startswith("/exit"):
+                exit_chat(nickname)
+                break
 
-            # Handle normal messages
+            # Handle normal messages to everyone
             else:
-                if message.lower() == "exit":
-                    # Handle client exit
-                    client_socket.send(f"{nickname} disconnected.".encode("utf-8"))
-                    print(f"{nickname} disconnected.")
-                    break
-                # Broadcast the message to all connected clients if not private message
                 broadcast(f"{nickname}: {message}")
+
         except:
             # Handle disconnection
             print(f"{nickname} disconnected.")
@@ -88,11 +102,6 @@ def handle_client(client_socket, nickname):
             broadcast(f"{nickname} has left the chat.")
             client_socket.close()
             break
-
-# Function to broadcast messages to all connected clients
-def broadcast(message):
-    for client_socket in clients.values():
-        client_socket.send(message.encode("utf-8"))
 
 # Main server function to start listening for connections and handle clients
 def start_server():
